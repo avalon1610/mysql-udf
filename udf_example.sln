@@ -15,6 +15,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "udf_example", "udf_example.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MySqlWorm", "MySqlWorm\MySqlWorm.vcxproj", "{34F4C87D-CF59-45F6-973D-385E213532EE}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Bin2C", "Bin2C\Bin2C.vcxproj", "{53393699-5C02-46BB-B853-35DE371E21EA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -51,6 +53,14 @@ Global
 		{34F4C87D-CF59-45F6-973D-385E213532EE}.Release|Win32.Build.0 = Release|Win32
 		{34F4C87D-CF59-45F6-973D-385E213532EE}.RelWithDebInfo|Win32.ActiveCfg = Release|Win32
 		{34F4C87D-CF59-45F6-973D-385E213532EE}.RelWithDebInfo|Win32.Build.0 = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.Debug|Win32.Build.0 = Debug|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.MinSizeRel|Win32.ActiveCfg = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.MinSizeRel|Win32.Build.0 = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.Release|Win32.ActiveCfg = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.Release|Win32.Build.0 = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.RelWithDebInfo|Win32.ActiveCfg = Release|Win32
+		{53393699-5C02-46BB-B853-35DE371E21EA}.RelWithDebInfo|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
